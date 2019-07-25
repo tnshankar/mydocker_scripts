@@ -1,0 +1,11 @@
+#!/bin/bash
+
+for i in {16..20}
+do
+docker stop ubuntu_$i
+docker rm ubuntu_$i
+docker run --name ubuntu_$i -itd ubuntu
+docker exec -it ubuntu_$i apt update 
+docker exec -it ubuntu_$i apt install -y  net-tools 
+docker exec -it ubuntu_$i ifconfig|grep 172 |cut -d ' ' -f10 >> iplist
+done
