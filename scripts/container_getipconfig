@@ -6,6 +6,7 @@ if [ -f "$file" ]
 then
     echo "$0: File '${file}' found."
     rm $file
+    echo "removed iplist file"
 fi
 
 # Deleting existing docker ip address from /etc/hosts file .
@@ -15,46 +16,56 @@ sudo sed -i '/node/d' /etc/hosts
 
 sudo apt install ansible
 
-max=10
+max=20
+min=1
 
-for i in {1..$max}
+for (( i=$min; i<=$max; i++ ))
 do
-docker stop ubuntu_dock_user_$i
-docker rm ubuntu_dock_user_$i
-docker run --name ubuntu_dock_user_$i -itd ubuntu
-docker exec -it ubuntu_dock_user_$i apt update
-docker exec -it ubuntu_dock_user_$i apt install openssh-server
-docker exec -it ubuntu_dock_user_$i apt install -y  net-tools
-docker exec -it ubuntu_dock_user_$i apt install python
-docker exec -it ubuntu_dock_user_$i ifconfig|grep 172 |cut -d ' ' -f10 >> iplist
-docker exec -it ubuntu_dock_user_$i sudo service ssh start
+docker stop ubuntu_dock_user_final_$i
+docker rm ubuntu_dock_user_final_$i
+docker rm ubuntu_dock_user_final_$i
+docker run --name ubuntu_dock_user_final_$i -itd ubuntu
+docker exec -it ubuntu_dock_user_final_$i apt update
+docker exec -it ubuntu_dock_user_final_$i apt install -y openssh-server
+docker exec -it ubuntu_dock_user_final_$i apt install -y  net-tools
+docker exec -it ubuntu_dock_user_final_$i apt install -y python
+docker exec -it ubuntu_dock_user_final_$i ifconfig|grep 172 |cut -d ' ' -f10 >> iplist
+docker exec -it ubuntu_dock_user_final_$i service ssh start
+
 done
 
 # ping the hosts
 
 while IFS= read -r line;
 do
-  ping -c1 $line
-  if [ $? -eq 0 ]
-  then
-    echo "$line ok "
-  ssh-copy-id dock@$line
-  else
-      echo "$line not able to ping"
-      exit 1
-  fi
-done < "/home/sankaran/iplist"
+ping -c1 $line
+if [ $? -eq 0 ]
+then
+echo "$line ok "
+# ssh-copy-id dock@$line
+ if [ $? -eq 0 ]
+ then
+         echo "copied ssh key successfully to dock user @ $line"
+ else
+         echo "unable to add sshkey to dock user @ $line "
 
+         exit 1
+    fi
+   else
+     echo "$line not able to ping"
+     exit 1
+ fi
+done < "/home/sankaran/iplist"
 
 # Adding iplist values into /etc/hosts
 input="/home/sankaran/iplist"
 i=0
 while IFS= read -r line
 do
-        let "i+=1"
-  echo "$line node$i"
-  echo "$line node$i" >> /etc/hosts
-  echo "$line node$i" >> /etc/ansible/hosts
+       let "i+=1"
+ echo "$line node$i"
+ echo "$line node$i" >> /etc/hosts
+ echo "$line node$i" >> /etc/ansible/hosts
 done < "$input"
 
 # Group the node in ansible
