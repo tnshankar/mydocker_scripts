@@ -1,11 +1,64 @@
-#!/bin/bash
+#!/bin/bash -e
 
-for i in {16..20}
+# Deleting the file
+file="/home/sankaran/iplist"
+if [ -f "$file" ]
+then
+    echo "$0: File '${file}' found."
+    rm $file
+fi
+
+# Deleting existing docker ip address from /etc/hosts file .
+#Becasue when we run this script new ip address will be created
+
+sudo sed -i '/node/d' /etc/hosts
+
+sudo apt install ansible
+
+max=10
+
+for i in {1..$max}
 do
-docker stop ubuntu_$i
-docker rm ubuntu_$i
-docker run --name ubuntu_$i -itd ubuntu
-docker exec -it ubuntu_$i apt update 
-docker exec -it ubuntu_$i apt install -y  net-tools 
-docker exec -it ubuntu_$i ifconfig|grep 172 |cut -d ' ' -f10 >> iplist
+docker stop ubuntu_dock_user_$i
+docker rm ubuntu_dock_user_$i
+docker run --name ubuntu_dock_user_$i -itd ubuntu
+docker exec -it ubuntu_dock_user_$i apt update
+docker exec -it ubuntu_dock_user_$i apt install openssh-server
+docker exec -it ubuntu_dock_user_$i apt install -y  net-tools
+docker exec -it ubuntu_dock_user_$i apt install python
+docker exec -it ubuntu_dock_user_$i ifconfig|grep 172 |cut -d ' ' -f10 >> iplist
+docker exec -it ubuntu_dock_user_$i sudo service ssh start
 done
+
+# ping the hosts
+
+while IFS= read -r line;
+do
+  ping -c1 $line
+  if [ $? -eq 0 ]
+  then
+    echo "$line ok "
+  ssh-copy-id dock@$line
+  else
+      echo "$line not able to ping"
+      exit 1
+  fi
+done < "/home/sankaran/iplist"
+
+
+# Adding iplist values into /etc/hosts
+input="/home/sankaran/iplist"
+i=0
+while IFS= read -r line
+do
+        let "i+=1"
+  echo "$line node$i"
+  echo "$line node$i" >> /etc/hosts
+  echo "$line node$i" >> /etc/ansible/hosts
+done < "$input"
+
+# Group the node in ansible
+
+sed -i '/node1/ i \ [ubuntu_host1_grp1] ' /etc/ansible/hosts
+
+sed -i '/node6/ i \ [ubuntu_host1_grp2]' /etc/ansible/hosts
